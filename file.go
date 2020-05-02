@@ -32,8 +32,9 @@ func (c *SafeUnlocated) Inc() {
 }
 
 var unlocated SafeUnlocated
+var wg sync.WaitGroup
 
-func parser(locations [][]string, points chan []Point){
+func parser(locations [][]string){
 	var unl int
 	var coordinates []Point
 	for _, location := range locations{
@@ -57,12 +58,27 @@ func parser(locations [][]string, points chan []Point){
 			unl++
 			unlocated.Inc()
 		} else {
-				address := location[0] + " " + strconv.Itoa(number)
-				point := Point{coordinate.Latitude, coordinate.Longitude, address}
-				coordinates = append(coordinates, point)
+			address := location[0] + " " + strconv.Itoa(number)
+			point := Point{coordinate.Latitude, coordinate.Longitude, address}
+			coordinates = append(coordinates, point)
 		}
 	}
-	points <- coordinates
+	db, err := sql.Open("sqlite3", "testGo.db")
+	if err != nil {
+		panic(err)
+	}
+	for j := 0; j < len(coordinates); j++ {
+		_, err := db.Exec("insert into LOCATIONS (name, latitude, longitude, num_of_cases)  values "+
+			"($1, $2, $3, $4)", coordinates[j].Address, coordinates[j].Lat, coordinates[j].Lon, 1)
+		if err != nil {
+			panic(err)
+		}
+	}
+	err = db.Close()
+	if err != nil {
+		panic(err)
+	}
+	wg.Done()
 }
 
 
@@ -106,38 +122,22 @@ func main(){
 		}
 		tt = z.Next()
 	}
-	num_of_gorut := 0
-	points := make(chan []Point)
-	content = content[:20]
-	for i := 0; (i * 100) < len(content); i++ {
-		if (i + 1) * 100 < len(content) {
-			go parser(content[i * 100:(i + 1) * 100], points)
-		} else {
-			go parser(content[i:], points)
-		}
-		num_of_gorut++
+	objects_per_rout := 50
+	content = content[:100]
+	num_of_gorut := len(content) / objects_per_rout
+	if len(content) % objects_per_rout != 0 {
+		num_of_gorut += 1
 	}
-	var coordinates [][]Point
-	for j:=0; j < num_of_gorut; j++ {
-		coordinates = append(coordinates, <-points)
-	}
-	db, err := sql.Open("sqlite3", "testGo.db")
-	if err != nil {
-		panic(err)
-	}
+	fmt.Println(num_of_gorut)
+	wg.Add(num_of_gorut)
 	for i := 0; i < num_of_gorut; i++ {
-		for j := 0; j < len(coordinates[i]); j++ {
-			_, err := db.Exec("insert into LOCATIONS (name, latitude, longitude, num_of_cases)  values "+
-				"($1, $2, $3, $4)", coordinates[i][j].Address, coordinates[i][j].Lat, coordinates[i][j].Lon, 1)
-			if err != nil {
-				panic(err)
-			}
+		if (i + 1) * 100 < len(content) {
+			go parser(content[i * 100:(i + 1) * 100])
+		} else {
+			go parser(content[i * 100:])
 		}
 	}
-	err = db.Close()
-	if err != nil {
-		panic(err)
-	}
+	wg.Wait()
 	fmt.Println(unlocated.counter)
 	t = time.Now()
 	fmt.Println(t.Sub(start))
