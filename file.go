@@ -6,6 +6,7 @@ import (
 	"github.com/kelvins/geocoder"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/net/html"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -34,11 +35,11 @@ func (c *SafeUnlocated) Inc() {
 var unlocated SafeUnlocated
 var wg sync.WaitGroup
 
-func parser(locations [][]string){
+func parser(locations [][]string, key string){
 	var unl int
 	var coordinates []Point
 	for _, location := range locations{
-		geocoder.ApiKey = "AIzaSyB14mkvENlG5NeR51b-YMeEV_MclVEUgXk"
+		geocoder.ApiKey = key
 		var number int
 		loc := strings.Split(location[1], "/")
 		if len(loc) > 1{
@@ -64,6 +65,11 @@ func parser(locations [][]string){
 		}
 	}
 	db, err := sql.Open("sqlite3", "testGo.db")
+	for err != nil{
+		time.Sleep(2)
+		db, err = sql.Open("sqlite3", "testGo.db")
+	}
+
 	if err != nil {
 		panic(err)
 	}
@@ -90,6 +96,8 @@ func main(){
 	flag := false
 	var td []string
 	var content [][]string
+	data, _ := ioutil.ReadFile("apiKey.txt")
+	key := string(data)
 	start := time.Now()
 	t := time.Now()
 	start = time.Now()
@@ -122,8 +130,8 @@ func main(){
 		}
 		tt = z.Next()
 	}
-	objects_per_rout := 50
-	content = content[:100]
+	objects_per_rout := 5
+	content = content[:30]
 	num_of_gorut := len(content) / objects_per_rout
 	if len(content) % objects_per_rout != 0 {
 		num_of_gorut += 1
@@ -131,14 +139,14 @@ func main(){
 	fmt.Println(num_of_gorut)
 	wg.Add(num_of_gorut)
 	for i := 0; i < num_of_gorut; i++ {
-		if (i + 1) * 100 < len(content) {
-			go parser(content[i * 100:(i + 1) * 100])
+		if (i + 1) * objects_per_rout < len(content) {
+			go parser(content[i * objects_per_rout:(i + 1) * objects_per_rout], key)
 		} else {
-			go parser(content[i * 100:])
+			go parser(content[i * objects_per_rout:], key)
 		}
 	}
 	wg.Wait()
-	fmt.Println(unlocated.counter)
 	t = time.Now()
+	fmt.Println(unlocated.counter)
 	fmt.Println(t.Sub(start))
 }
