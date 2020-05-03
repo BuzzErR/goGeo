@@ -69,10 +69,6 @@ func parser(locations [][]string, key string){
 		time.Sleep(2)
 		db, err = sql.Open("sqlite3", "testGo.db")
 	}
-
-	if err != nil {
-		panic(err)
-	}
 	for j := 0; j < len(coordinates); j++ {
 		_, err := db.Exec("insert into LOCATIONS (name, latitude, longitude, num_of_cases)  values "+
 			"($1, $2, $3, $4)", coordinates[j].Address, coordinates[j].Lat, coordinates[j].Lon, 1)
