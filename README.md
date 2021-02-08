@@ -1,2 +1,2 @@
-# goGeo - webparser for page on website, that contains table with coronavirus cases in Moscow. 
+# goGeo - multithread parser for webpage
 You should create apiKey.txt with your google api key. 
